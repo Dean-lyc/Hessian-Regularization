@@ -10,9 +10,9 @@ import numpy as np
 import time
 import datetime
 from tqdm import tqdm
-# from torch.nn.parallel import DistributedDataParallel as DDP
-from apex import amp
-from apex.parallel import DistributedDataParallel as DDP
+from torch.nn.parallel import DistributedDataParallel as DDP
+# from apex import amp
+# from apex.parallel import DistributedDataParallel as DDP
 import argparse
 import torch.distributed as dist
 from datetime import timedelta
@@ -57,7 +57,7 @@ def main():
 
 
     # Dataset setting
-    parser.add_argument("--dataset_path", type=str, default='./data',
+    parser.add_argument("--dataset_path", type=str, default='../data',
                         help="where is the datset")
     parser.add_argument("--dataset_name", type=str, default='CIFAR10',
                         help="the name of the dataset")
@@ -90,7 +90,8 @@ def main():
 
 
     if args.local_rank!=-1:
-        net = DDP(net, message_size=250000000, gradient_predivide_factor=get_world_size(), delay_allreduce=True)
+        # net = DDP(net, message_size=250000000, gradient_predivide_factor=get_world_size(), delay_allreduce=True)
+        net = DDP(net)
 
 
 
@@ -128,9 +129,9 @@ def main():
             loss_super = criterion(outputs, labels)
 
             # Calculate trae with hutchinson
-            trace, hessian_tr = hutchinson(args, net, loss_super, outputs)
+            trace, hessian_tr = hutchinson(args, net, loss_super, outputs, device)
 
-            loss = loss_super + args.lambda_JR * (trace / maxIter)
+            loss = loss_super + args.lambda_JR * (trace / args.Hiter)
             loss.backward()
             optimizer.step()
             with torch.no_grad():
@@ -138,30 +139,19 @@ def main():
                 running_loss += loss_super.item()
                 hessian_loss += hessian_tr
 
-            if times % 10000 == 9999 or times+1 == len(trainLoader):
-                if args.local_rank in [-1, 0]:
-                    print('[%d/%d, %d/%d] loss: %.3f hessian loss: %.3f' % (epoch+1, args.epochs, times+1, len(trainLoader), running_loss/10000, hessian_loss/10000))
-
-
-        if args.local_rank in [-1, 0]:
-            print(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * correct / total):3f}%')
-            with open('random_hessian_200.txt','a',encoding='utf-8') as f:
-                f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * correct / total):3f}%')
-
-
-
+        train_acc = correct / total
         # Validation after training
-        valid_acc = valid(testLoader, net)
+        valid_acc = valid(args, net, testLoader)
         if valid_acc >  max_test:
             max_test = valid_acc
         if args.local_rank in [-1, 0]:
-            print(f'[Epoch {epoch+1}/{args.epochs}] TEST Accuracy : {(100 * valid_acc):3f}%')
+            print(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%)')
             with open('random_hessian_200.txt','a',encoding='utf-8') as f:
-                f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * correct / total):3f}%')
+                f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * train_acc):3f} | TEST Accuracy : {(100 * valid_acc):3f}%')
         scheduler.step()
 
-        train_record.append(correct / total)
-        test_record.append(correct / total)
+        train_record.append(train_acc)
+        test_record.append(valid_acc)
 
     if args.local_rank in [-1, 0]:
         print('Finished Training, max test accuracy', 100 * max_test)

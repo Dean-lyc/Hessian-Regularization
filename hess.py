@@ -42,7 +42,7 @@ def select_param(param, prob):
     return result
 
 
-def hutchinson(args, net, loss_super, outputs):
+def hutchinson(args, net, loss_super, outputs, device):
 
     params = [outputs]
     trace = 0.
@@ -63,14 +63,13 @@ def hutchinson(args, net, loss_super, outputs):
     grads = torch.autograd.grad(loss_super, params, retain_graph=True, create_graph=True)
 
     for i in grads:
-        # jacobi_norm += torch.norm(i)
         grad_list.append(i)
 
     # calculate hessian trace
     trace_vhv = []
 
     if len(grad_list) > 0:
-        for iii in range(maxIter):
+        for iii in range(args.Hiter):
             v = [torch.randint_like(p, high=1, device=device) for p in params]
             for v_i in v:
                 v_i[v_i == 0] = -1
