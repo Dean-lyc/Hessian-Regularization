@@ -16,6 +16,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import argparse
 import torch.distributed as dist
 from datetime import timedelta
+import os
 
 
 from resnet import ResNet18, ResNet50
@@ -43,6 +44,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--local_rank", type=int, default=-1,
                         help="local_rank for distributed training on gpus")
+    parser.add_argument("--output_dir", type=str, default="res",
+                        help="output directory")
+
+
     # Training settings
     parser.add_argument("--batch_size", type=int, default=32,
                         help="Batch size")
@@ -79,6 +84,9 @@ def main():
                         help="The interval to calculate hessian trace")
     args = parser.parse_args()
 
+
+    if not os.path.exists(os.path.join(args.output_dir)):
+        os.makedirs(os.path.join(args.output_dir))
 
     if args.local_rank==-1:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -158,7 +166,7 @@ def main():
             max_test = valid_acc
         if args.local_rank in [-1, 0]:
             print(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%)')
-            with open('random_hessian_200.txt','a',encoding='utf-8') as f:
+            with open(f'{output_dir}/random_hessian_200.txt','a',encoding='utf-8') as f:
                 f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * train_acc):3f} | TEST Accuracy : {(100 * valid_acc):3f}%\n')
         scheduler.step()
 
@@ -167,7 +175,7 @@ def main():
 
     if args.local_rank in [-1, 0]:
         print('Finished Training, max test accuracy', 100 * max_test)
-        with open('random_hessian_200.txt','a',encoding='utf-8') as f:
+        with open(f'{output_dir}/random_hessian_200.txt','a',encoding='utf-8') as f:
             f.write('Best TEST Accuracy inputs: %.3f %% \n' % (100 * max_test))
         end_time = datetime.datetime.now()
         delta = end_time - start_time
@@ -179,7 +187,7 @@ def main():
         plt.ylabel("Accuracy")
         plt.xlabel("Epoch")
         plt.legend()
-        plt.savefig('random_hessian_200.png')
+        plt.savefig(f'{output_dir}/random_hessian_200.png')
 
 
 if __name__ == "__main__":
