@@ -22,6 +22,7 @@ import os
 from resnet import ResNet18, ResNet50
 from utils import *
 from hess import *
+from othermethod import *
 
 
 def valid(args, net, testLoader, device):
@@ -82,6 +83,18 @@ def main():
                         help="The standard deviation of noise")
     parser.add_argument("--hess_interval", type=int, default=10,
                         help="The interval to calculate hessian trace")
+    parser.add_argument("--lambda_CP", type=float, default=0,
+                        help="Coefficieint of Confidence Penalty")
+    parser.add_argument("--lambda_LS", type=float, default=0,
+                        help="Coefficieint of Label Smoothing")
+    parser.add_argument("--alpha_mixup", type=float, default=0,
+                        help="alpha for mix up")
+    parser.add_argument("--mask_size", type=int, default=0,
+                        help="mask size for cutout")
+    parser.add_argument("--p_cutout", type=float, default=0,
+                        help="p for cutout")
+    parser.add_argument("--graph", type=int, default=1,
+                        help="draw the graph")
     args = parser.parse_args()
 
 
@@ -113,9 +126,12 @@ def main():
         param.requires_grad =True
 
     criterion = nn.CrossEntropyLoss()
+    cp = ConfidencePenalty()
+    ls = LabelSmoothing()
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     train_record = []
     test_record = []
+    hessian_record = []
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
     start_time = datetime.datetime.now()
@@ -138,11 +154,24 @@ def main():
             inputs.requires_grad = True
 
             optimizer.zero_grad()
-            outputs = net(inputs)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-            loss_super = criterion(outputs, labels)
+            if args.alpha_mixup == 0:
+                outputs = net(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                loss_super = criterion(outputs, labels)
+            else:
+                inputs, targets_a, targets_b, lam = mixup_data(inputs, labels)
+                inputs, targets_a, targets_b = map(Variable, (inputs,
+                                                          targets_a, targets_b))
+            
+                outputs = net(inputs)
+                loss_super = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (lam * predicted.eq(targets_a.data).cpu().sum().float()
+                    + (1 - lam) * predicted.eq(targets_b.data).cpu().sum().float())
+            
 
             # Calculate trae with hutchinson
             if idx % args.hess_interval == 0:
@@ -152,6 +181,10 @@ def main():
             else:
                 hloss = args.lambda_JR * (trace / args.Hiter)
             loss = loss_super + hloss
+            if args.lambda_CP > 0:
+                loss = loss + args.lambda_CP * cp(outputs)
+            if args.lambda_LS > 0:
+                loss = loss + args.lambda_CP * ls(outputs)
             loss.backward()
             optimizer.step()
             with torch.no_grad():
@@ -165,31 +198,37 @@ def main():
         if valid_acc >  max_test:
             max_test = valid_acc
         if args.local_rank in [-1, 0]:
-            print(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%)')
-            with open(f'{args.output_dir}/random_hessian_200.txt','a',encoding='utf-8') as f:
-                f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * train_acc):3f} | TEST Accuracy : {(100 * valid_acc):3f}%\n')
+            print(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%) | Hessian Loss : ({(hessian_loss):3f})' )
+            with open(f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.txt','a',encoding='utf-8') as f:
+                f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * train_acc):3f}% | TEST Accuracy : {(100 * valid_acc):3f}% | Hessian Loss : {(hessian_loss):3f}\n')
         scheduler.step()
 
         train_record.append(train_acc)
         test_record.append(valid_acc)
+        hessian_record.append(hessian_loss)
 
     if args.local_rank in [-1, 0]:
         print('Finished Training, max test accuracy', 100 * max_test)
-        with open(f'{args.output_dir}/random_hessian_200.txt','a',encoding='utf-8') as f:
+        with open(f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.txt','a',encoding='utf-8') as f:
             f.write('Best TEST Accuracy inputs: %.3f %% \n' % (100 * max_test))
         end_time = datetime.datetime.now()
         delta = end_time - start_time
         delta_gmtime = time.gmtime(delta.total_seconds())
         duration_str = time.strftime("%H:%M:%S", delta_gmtime)
         print(duration_str)
-        plt.plot(train_record,label="train accuracy")
-        plt.plot(test_record,label="test accuracy")
-        plt.ylabel("Accuracy")
-        plt.xlabel("Epoch")
-        plt.legend()
-        plt.savefig(f'{args.output_dir}/random_hessian_200.png')
+        if args.graph == 1:
+            fig = plt.figure()
+            ax1 = fig.add_subplot(111)
+            ax1.plot(train_record,label="train accuracy")
+            ax1.plot(test_record,label="test accuracy")
+            ax1.set_ylabel('Accuracy')
+            ax2 = ax1.twinx() 
+            ax2.plot(hessian_record,label='Hessian Trace')
+            ax2.set_ylabel('Estimated Hessian Trace')
+            ax2.set_xlabel('Epoch')
+            plt.legend()
+            plt.savefig(f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.png')
 
 
 if __name__ == "__main__":
     main()
-
