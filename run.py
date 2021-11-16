@@ -85,8 +85,8 @@ def main():
     args = parser.parse_args()
 
 
-    if not os.path.exists(os.path.join(args.output_dir)):
-        os.makedirs(os.path.join(args.output_dir))
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
 
     if args.local_rank==-1:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

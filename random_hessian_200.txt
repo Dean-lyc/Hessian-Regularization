@@ -23,3 +23,5 @@
 [Epoch 23/200] TRAINING Accuracy : 97.950000 | TEST Accuracy : 91.110000%
 [Epoch 24/200] TRAINING Accuracy : 98.038000 | TEST Accuracy : 91.540000%
 [Epoch 25/200] TRAINING Accuracy : 98.078000 | TEST Accuracy : 91.150000%
+[Epoch 26/200] TRAINING Accuracy : 98.050000 | TEST Accuracy : 91.430000%
+[Epoch 27/200] TRAINING Accuracy : 98.226000 | TEST Accuracy : 91.420000%
