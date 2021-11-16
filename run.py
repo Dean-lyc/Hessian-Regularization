@@ -23,7 +23,7 @@ from utils import *
 from hess import *
 
 
-def valid(args, net, testLoader):
+def valid(args, net, testLoader, device):
     net.eval()
     correct = 0
     total = 0
@@ -65,9 +65,9 @@ def main():
                         help="number of workers of data loader")
 
     # Regularization setting
-    parser.add_argument("--lambda_JR", type=float, default=0.1,
+    parser.add_argument("--lambda_JR", type=float, default=0.001,
                         help="Coefficieint of Jacobian Regularization")
-    parser.add_argument("--Hiter", type=float, default=5,
+    parser.add_argument("--Hiter", type=int, default=5,
                         help="Iterations of Hutchinson")
     parser.add_argument("--prob", type=float, default=0.1,
                         help="Random sampling on binomial")
@@ -116,7 +116,9 @@ def main():
         running_loss = 0.0
         correct = 0
         total = 0
-        for times, data in tqdm(enumerate(trainLoader, 0)):
+        trace = 0
+        hessian_tr = 0
+        for idx, data in tqdm(enumerate(trainLoader, 0)):
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
             inputs.requires_grad = True
@@ -129,7 +131,8 @@ def main():
             loss_super = criterion(outputs, labels)
 
             # Calculate trae with hutchinson
-            trace, hessian_tr = hutchinson(args, net, loss_super, outputs, device)
+            if idx % 10 == 0:
+                trace, hessian_tr = hutchinson(args, net, loss_super, outputs, device)
 
             loss = loss_super + args.lambda_JR * (trace / args.Hiter)
             loss.backward()
@@ -141,7 +144,7 @@ def main():
 
         train_acc = correct / total
         # Validation after training
-        valid_acc = valid(args, net, testLoader)
+        valid_acc = valid(args, net, testLoader, device)
         if valid_acc >  max_test:
             max_test = valid_acc
         if args.local_rank in [-1, 0]:
