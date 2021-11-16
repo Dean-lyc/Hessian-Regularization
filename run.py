@@ -140,7 +140,7 @@ def main():
             if idx % args.hess_interval == 0:
                 trace, hessian_tr = hutchinson(args, net, loss_super, outputs, device)
             if args.add_noise:
-                hloss = torch.normal(args.lambda_JR * (trace / args.Hiter), torch.ones(1)*args.noise_std)
+                hloss = torch.normal(args.lambda_JR * (trace / args.Hiter), torch.ones(1).cuda()*args.noise_std)
             else:
                 hloss = args.lambda_JR * (trace / args.Hiter)
             loss = loss_super + hloss
