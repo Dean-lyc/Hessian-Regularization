@@ -15,6 +15,9 @@ CUDA_VISIBLE_DEVICE="0,1,2,3" python -m torch.distributed.launch \
 --lambda_JR 0.1 \
 --Hiter 5 \
 --prob 1 \
+--add_noise 1 \
+--noise_std 1 \
+--hess_interval 10 \
 ```
 
 

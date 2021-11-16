@@ -1,0 +1,23 @@
+[Epoch 1/200] TRAINING Accuracy : 66.746000 | TEST Accuracy : 78.220000%[Epoch 2/200] TRAINING Accuracy : 83.628000 | TEST Accuracy : 85.080000%[Epoch 3/200] TRAINING Accuracy : 88.390000 | TEST Accuracy : 86.030000%[Epoch 4/200] TRAINING Accuracy : 90.800000 | TEST Accuracy : 87.760000%[Epoch 5/200] TRAINING Accuracy : 92.616000 | TEST Accuracy : 88.060000%[Epoch 6/200] TRAINING Accuracy : 93.900000 | TEST Accuracy : 88.860000%[Epoch 7/200] TRAINING Accuracy : 94.828000 | TEST Accuracy : 89.850000%[Epoch 8/200] TRAINING Accuracy : 95.412000 | TEST Accuracy : 88.400000%[Epoch 9/200] TRAINING Accuracy : 95.924000 | TEST Accuracy : 90.450000%[Epoch 1/200] TRAINING Accuracy : 66.798000 | TEST Accuracy : 78.860000%
+[Epoch 2/200] TRAINING Accuracy : 83.966000 | TEST Accuracy : 83.830000%
+[Epoch 3/200] TRAINING Accuracy : 88.194000 | TEST Accuracy : 86.010000%
+[Epoch 4/200] TRAINING Accuracy : 90.968000 | TEST Accuracy : 87.340000%
+[Epoch 5/200] TRAINING Accuracy : 92.630000 | TEST Accuracy : 87.940000%
+[Epoch 6/200] TRAINING Accuracy : 93.640000 | TEST Accuracy : 88.540000%
+[Epoch 7/200] TRAINING Accuracy : 94.580000 | TEST Accuracy : 90.220000%
+[Epoch 8/200] TRAINING Accuracy : 95.466000 | TEST Accuracy : 90.130000%
+[Epoch 9/200] TRAINING Accuracy : 95.808000 | TEST Accuracy : 90.170000%
+[Epoch 10/200] TRAINING Accuracy : 96.492000 | TEST Accuracy : 89.960000%
+[Epoch 11/200] TRAINING Accuracy : 96.840000 | TEST Accuracy : 91.060000%
+[Epoch 12/200] TRAINING Accuracy : 97.094000 | TEST Accuracy : 90.980000%
+[Epoch 13/200] TRAINING Accuracy : 97.484000 | TEST Accuracy : 90.640000%
+[Epoch 14/200] TRAINING Accuracy : 97.566000 | TEST Accuracy : 90.990000%
+[Epoch 15/200] TRAINING Accuracy : 97.562000 | TEST Accuracy : 91.280000%
+[Epoch 16/200] TRAINING Accuracy : 97.750000 | TEST Accuracy : 91.040000%
+[Epoch 17/200] TRAINING Accuracy : 97.810000 | TEST Accuracy : 91.390000%
+[Epoch 18/200] TRAINING Accuracy : 97.778000 | TEST Accuracy : 91.570000%
+[Epoch 19/200] TRAINING Accuracy : 97.966000 | TEST Accuracy : 91.960000%
+[Epoch 20/200] TRAINING Accuracy : 97.876000 | TEST Accuracy : 90.830000%
+[Epoch 21/200] TRAINING Accuracy : 97.960000 | TEST Accuracy : 91.100000%
+[Epoch 22/200] TRAINING Accuracy : 97.870000 | TEST Accuracy : 91.800000%
+[Epoch 23/200] TRAINING Accuracy : 97.950000 | TEST Accuracy : 91.110000%

@@ -71,6 +71,12 @@ def main():
                         help="Iterations of Hutchinson")
     parser.add_argument("--prob", type=float, default=0.1,
                         help="Random sampling on binomial")
+    parser.add_argument("--add_noise", type=int, default=0,
+                        help="Whether use noisy trace across each part")
+    parser.add_argument("--noise_std", type=int, default=1,
+                        help="The standard deviation of noise")
+    parser.add_argument("--hess_interval", type=int, default=10,
+                        help="The interval to calculate hessian trace")
     args = parser.parse_args()
 
 
@@ -131,10 +137,13 @@ def main():
             loss_super = criterion(outputs, labels)
 
             # Calculate trae with hutchinson
-            if idx % 10 == 0:
+            if idx % args.hess_interval == 0:
                 trace, hessian_tr = hutchinson(args, net, loss_super, outputs, device)
-
-            loss = loss_super + args.lambda_JR * (trace / args.Hiter)
+            if args.add_noise:
+                hloss = torch.normal(args.lambda_JR * (trace / args.Hiter), torch.ones(1)*args.noise_std)
+            else:
+                hloss = args.lambda_JR * (trace / args.Hiter)
+            loss = loss_super + hloss
             loss.backward()
             optimizer.step()
             with torch.no_grad():
@@ -150,7 +159,7 @@ def main():
         if args.local_rank in [-1, 0]:
             print(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%)')
             with open('random_hessian_200.txt','a',encoding='utf-8') as f:
-                f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * train_acc):3f} | TEST Accuracy : {(100 * valid_acc):3f}%')
+                f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * train_acc):3f} | TEST Accuracy : {(100 * valid_acc):3f}%\n')
         scheduler.step()
 
         train_record.append(train_acc)
