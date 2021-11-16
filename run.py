@@ -22,7 +22,6 @@ import os
 from resnet import ResNet18, ResNet50
 from utils import *
 from hess import *
-from othermethod import *
 
 
 def valid(args, net, testLoader, device):
@@ -60,6 +59,9 @@ def main():
                         help="Momentum")
     parser.add_argument("--weight_decay", type=float, default=5e-4,
                         help="Total epoch")
+    parser.add_argument("--model", type=str, default="resnet18",
+                        help="Model name")
+
 
 
     # Dataset setting
@@ -87,7 +89,7 @@ def main():
                         help="Coefficieint of Confidence Penalty")
     parser.add_argument("--lambda_LS", type=float, default=0,
                         help="Coefficieint of Label Smoothing")
-    parser.add_argument("--alpha_mixup", type=float, default=0,
+    parser.add_argument("--alpha_mixup", type=float, default=0.1,
                         help="alpha for mix up")
     parser.add_argument("--mask_size", type=int, default=0,
                         help="mask size for cutout")
@@ -101,6 +103,8 @@ def main():
     if not os.path.exists(args.output_dir) and args.local_rank in [0, -1]:
         os.makedirs(args.output_dir)
 
+    output_filename = f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.txt'
+
     if args.local_rank==-1:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         args.n_gpu = torch.cuda.device_count()
@@ -112,8 +116,8 @@ def main():
 
 
     trainLoader, testLoader = get_loader(args)
-
-    net = ResNet18().to(device)
+    if args.model == "resnet18":
+        net = ResNet18().to(device)
 
 
     if args.local_rank!=-1:
@@ -152,39 +156,40 @@ def main():
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
             inputs.requires_grad = True
-
             optimizer.zero_grad()
+            outputs = net(inputs)
+
+            # MixUp
             if args.alpha_mixup == 0:
-                outputs = net(inputs)
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
                 loss_super = criterion(outputs, labels)
             else:
-                inputs, targets_a, targets_b, lam = mixup_data(inputs, labels)
+                inputs, targets_a, targets_b, lam = mixup_data(inputs, labels, args.alpha_mixup)
                 inputs, targets_a, targets_b = map(Variable, (inputs,
                                                           targets_a, targets_b))
-            
-                outputs = net(inputs)
                 loss_super = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (lam * predicted.eq(targets_a.data).cpu().sum().float()
                     + (1 - lam) * predicted.eq(targets_b.data).cpu().sum().float())
             
-
-            # Calculate trae with hutchinson
+            # Calculate trace with hutchinson
             if idx % args.hess_interval == 0:
                 trace, hessian_tr = hutchinson(args, net, loss_super, outputs, device)
-            if args.add_noise:
-                hloss = torch.normal(args.lambda_JR * (trace / args.Hiter), torch.ones(1).cuda()*args.noise_std)
-            else:
-                hloss = args.lambda_JR * (trace / args.Hiter)
+
+            # Add Noise
+            hloss = torch.normal(args.lambda_JR * (trace / args.Hiter), torch.ones(1).cuda()*args.noise_std)
+            # Final Loss
             loss = loss_super + hloss
+
+            # Confidence Penalty / Label Smoothing
             if args.lambda_CP > 0:
                 loss = loss + args.lambda_CP * cp(outputs)
             if args.lambda_LS > 0:
                 loss = loss + args.lambda_CP * ls(outputs)
+
             loss.backward()
             optimizer.step()
             with torch.no_grad():
@@ -198,9 +203,10 @@ def main():
         if valid_acc >  max_test:
             max_test = valid_acc
         if args.local_rank in [-1, 0]:
-            print(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%) | Hessian Loss : ({(hessian_loss):3f})' )
-            with open(f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.txt','a',encoding='utf-8') as f:
-                f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * train_acc):3f}% | TEST Accuracy : {(100 * valid_acc):3f}% | Hessian Loss : {(hessian_loss):3f}\n')
+            INFO = f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%) | Hessian Loss : ({(hessian_loss):3f})\n'
+            print(INFO)
+            with open(output_filename ,'a',encoding='utf-8') as f:
+                f.write(INFO)
         scheduler.step()
 
         train_record.append(train_acc)
@@ -209,7 +215,7 @@ def main():
 
     if args.local_rank in [-1, 0]:
         print('Finished Training, max test accuracy', 100 * max_test)
-        with open(f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.txt','a',encoding='utf-8') as f:
+        with open(output_filename,'a',encoding='utf-8') as f:
             f.write('Best TEST Accuracy inputs: %.3f %% \n' % (100 * max_test))
         end_time = datetime.datetime.now()
         delta = end_time - start_time

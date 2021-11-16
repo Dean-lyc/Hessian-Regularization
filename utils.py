@@ -5,6 +5,9 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 import torch.distributed as dist
+import torch.nn.init as init
+from torch.autograd import Variable
+import numpy as np
 
 def get_world_size():
     if not dist.is_available():
@@ -12,6 +15,11 @@ def get_world_size():
     if not dist.is_initialized():
         return 1
     return dist.get_world_size()
+
+
+
+
+
 
 def cutout(mask_size, p, cutout_inside, mask_color=(0, 0, 0)):
     mask_size_half = mask_size // 2
@@ -95,3 +103,46 @@ def get_loader(args):
         testLoader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     return trainLoader, testLoader
+
+
+
+
+
+def mixup_data(x, y, alpha=1.0, use_cuda=True):
+    '''Returns mixed inputs, pairs of targets, and lambda'''
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    if use_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+class ConfidencePenalty(nn.Module):
+    def __init__(self):
+        super(ConfidencePenalty, self).__init__()
+
+    def forward(self, x):
+        b = F.softmax(x, dim=1) * F.log_softmax(x, dim=1)
+        b = -1.0 * b.sum()
+        return b
+
+class LabelSmoothing(nn.Module):
+    def __init__(self):
+        super(LabelSmoothing, self).__init__()
+
+    def forward(self, x, classes_num=10):
+        b = F.log_softmax(x, dim=1)
+        b = -1.0 * b.sum() / classes_num
+        return b
