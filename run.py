@@ -85,7 +85,7 @@ def main():
     args = parser.parse_args()
 
 
-    if not os.path.exists(args.output_dir):
+    if not os.path.exists(args.output_dir) and args.local_rank in [0, -1]:
         os.makedirs(args.output_dir)
 
     if args.local_rank==-1:
@@ -166,7 +166,7 @@ def main():
             max_test = valid_acc
         if args.local_rank in [-1, 0]:
             print(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%)')
-            with open(f'{output_dir}/random_hessian_200.txt','a',encoding='utf-8') as f:
+            with open(f'{args.output_dir}/random_hessian_200.txt','a',encoding='utf-8') as f:
                 f.write(f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : {(100 * train_acc):3f} | TEST Accuracy : {(100 * valid_acc):3f}%\n')
         scheduler.step()
 
@@ -175,7 +175,7 @@ def main():
 
     if args.local_rank in [-1, 0]:
         print('Finished Training, max test accuracy', 100 * max_test)
-        with open(f'{output_dir}/random_hessian_200.txt','a',encoding='utf-8') as f:
+        with open(f'{args.output_dir}/random_hessian_200.txt','a',encoding='utf-8') as f:
             f.write('Best TEST Accuracy inputs: %.3f %% \n' % (100 * max_test))
         end_time = datetime.datetime.now()
         delta = end_time - start_time
@@ -187,7 +187,7 @@ def main():
         plt.ylabel("Accuracy")
         plt.xlabel("Epoch")
         plt.legend()
-        plt.savefig(f'{output_dir}/random_hessian_200.png')
+        plt.savefig(f'{args.output_dir}/random_hessian_200.png')
 
 
 if __name__ == "__main__":
