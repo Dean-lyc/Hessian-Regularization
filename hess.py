@@ -57,7 +57,12 @@ def hutchinson(args, net, loss_super, outputs, device):
             # p = np.random.binomial(1, args.prob)
             # if p == 1:
             if 'weight' in name:
-                params.append(param)
+                if args.prob == 1:
+                    params.append(param)
+                else:
+                    p = np.random.binomial(1, prob)
+                    if p == 1:
+                        params.append(param)
     # print(params)
     # params = torch.tensor(params)
     grads = torch.autograd.grad(loss_super, params, retain_graph=True, create_graph=True)
@@ -71,8 +76,14 @@ def hutchinson(args, net, loss_super, outputs, device):
     if len(grad_list) > 0:
         for iii in range(args.Hiter):
             v = [torch.randint_like(p, high=1, device=device) for p in params]
-            for v_i in v:
-                v_i[v_i == 0] = -1
+            if args.prob == 1:
+                for v_i in v:
+                    v_i[v_i == 0] = -1
+            else:
+                for v_i in v:
+                        v_i[v_i == 0] = np.random.binomial(1, args.prob * 2)
+                    for v_i in v:
+                        v_i[v_i == 1] = 2 * np.random.binomial(1, 0.5) - 1
             Hv = torch.autograd.grad(grad_list,
                                      params,
                                      grad_outputs=v,
