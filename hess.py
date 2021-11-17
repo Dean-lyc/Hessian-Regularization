@@ -60,7 +60,7 @@ def hutchinson(args, net, loss_super, outputs, device):
                 if args.prob == 1:
                     params.append(param)
                 else:
-                    p = np.random.binomial(1, prob)
+                    p = np.random.binomial(1, args.prob)
                     if p == 1:
                         params.append(param)
     # print(params)
