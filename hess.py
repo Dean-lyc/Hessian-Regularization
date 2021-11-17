@@ -81,9 +81,9 @@ def hutchinson(args, net, loss_super, outputs, device):
                     v_i[v_i == 0] = -1
             else:
                 for v_i in v:
-                        v_i[v_i == 0] = np.random.binomial(1, args.prob * 2)
-                    for v_i in v:
-                        v_i[v_i == 1] = 2 * np.random.binomial(1, 0.5) - 1
+                    v_i[v_i == 0] = np.random.binomial(1, args.prob * 2)
+                for v_i in v:
+                    v_i[v_i == 1] = 2 * np.random.binomial(1, 0.5) - 1
             Hv = torch.autograd.grad(grad_list,
                                      params,
                                      grad_outputs=v,
