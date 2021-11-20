@@ -75,11 +75,12 @@ def hutchinson(args, net, loss_super, outputs, device):
 
     if len(grad_list) > 0:
         for iii in range(args.Hiter):
-            v = [torch.randint_like(p, high=1, device=device) for p in params]
             if args.prob == 1:
+                v = [torch.randint_like(p, high=2, device=device) for p in params]
                 for v_i in v:
                     v_i[v_i == 0] = -1
             else:
+                v = [torch.randint_like(p, high=1, device=device) for p in params]
                 for v_i in v:
                     v_i[v_i == 0] = np.random.binomial(1, args.prob * 2)
                 for v_i in v:
