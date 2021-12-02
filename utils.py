@@ -106,7 +106,7 @@ def get_loader(args):
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 normalize([0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]),
-                cutout(8, 1, True),
+                cutout(args.mask_size, args.p_cutout, True),
                 to_tensor(),
             ])
 
