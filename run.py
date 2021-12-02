@@ -19,25 +19,51 @@ from datetime import timedelta
 import os
 
 
-from resnet import ResNet18, ResNet50
+from resnet import ResNet18, ResNet50, Wide_ResNet28_10
 from utils import *
 from hess import *
 
 
 def valid(args, net, testLoader, device):
     net.eval()
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for data in tqdm(testLoader):
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = net(inputs)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+    if args.dataset_name == "CIFAR10":
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for data in tqdm(testLoader):
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = net(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-    return correct / total
+        return correct / total
+
+    elif args.dataset_name == "CIFAR100":
+        correct = 0
+        total = 0
+        correct_1 = 0
+        correct_5 = 0
+        with torch.no_grad():
+            for data in tqdm(testLoader):
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = net(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+                _, pred = outputs.topk(5, 1, largest=True, sorted=True)
+
+                label = labels.view(labels.size(0), -1).expand_as(pred)
+                correct = pred.eq(label).float()
+
+                #compute top 5
+                correct_5 += correct[:, :5].sum()
+
+                #compute top1
+                correct_1 += correct[:, :1].sum()
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+        return correct_1 / total, correct_5 / total
 
 
 def main():
@@ -89,7 +115,7 @@ def main():
                         help="Coefficieint of Confidence Penalty")
     parser.add_argument("--lambda_LS", type=float, default=0,
                         help="Coefficieint of Label Smoothing")
-    parser.add_argument("--alpha_mixup", type=float, default=0.1,
+    parser.add_argument("--alpha_mixup", type=float, default=0,
                         help="alpha for mix up")
     parser.add_argument("--mask_size", type=int, default=0,
                         help="mask size for cutout")
@@ -97,6 +123,8 @@ def main():
                         help="p for cutout")
     parser.add_argument("--graph", type=int, default=1,
                         help="draw the graph")
+    parser.add_argument("--dropout", type=float, default=0,
+                        help="dropout for wide resnet")
     args = parser.parse_args()
 
 
@@ -118,7 +146,8 @@ def main():
     trainLoader, testLoader = get_loader(args)
     if args.model == "resnet18":
         net = ResNet18().to(device)
-
+    elif args.model == "wide2810":
+        net = Wide_ResNet28_10(args).to(device)
 
     if args.local_rank!=-1:
         # net = DDP(net, message_size=250000000, gradient_predivide_factor=get_world_size(), delay_allreduce=True)
@@ -143,6 +172,8 @@ def main():
     correct = 0
     total = 0
     max_test = 0
+    max_test_1 = 0
+    max_test_5 = 0
     for epoch in range(args.epochs):
         net.train()
         hessian_loss = 0.0
@@ -199,14 +230,26 @@ def main():
 
         train_acc = correct / total
         # Validation after training
-        valid_acc = valid(args, net, testLoader, device)
-        if valid_acc >  max_test:
-            max_test = valid_acc
-        if args.local_rank in [-1, 0]:
-            INFO = f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%) | Hessian Loss : ({(hessian_loss):3f})\n'
-            print(INFO)
-            with open(output_filename ,'a',encoding='utf-8') as f:
-                f.write(INFO)
+        if args.dataset_name == "CIFAR10":
+            valid_acc = valid(args, net, testLoader, device)
+            if valid_acc >  max_test:
+                max_test = valid_acc
+            if args.local_rank in [-1, 0]:
+                INFO = f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST Accuracy : ({(100 * valid_acc):3f}%) | Hessian Loss : ({(hessian_loss):3f})\n'
+                print(INFO)
+                with open(output_filename ,'a',encoding='utf-8') as f:
+                    f.write(INFO)
+        elif if args.dataset_name == "CIFAR100":
+            valid_acc, valid_acc_5 = valid(args, net, testLoader, device)
+            if valid_acc >  max_test_1:
+                max_test_1 = valid_acc
+            if valid_acc_5 >  max_test_5:
+                max_test_5 = valid_acc_5
+            if args.local_rank in [-1, 0]:
+                INFO = f'[Epoch {epoch+1}/{args.epochs}] TRAINING Accuracy : ({(100 * train_acc):3f}%) | TEST1 Accuracy : ({(100 * valid_acc):3f}%) | TEST5 Accuracy : ({(100 * valid_acc_5):3f}%) Hessian Loss : ({(hessian_loss):3f})\n'
+                print(INFO)
+                with open(output_filename ,'a',encoding='utf-8') as f:
+                    f.write(INFO)
         scheduler.step()
 
         train_record.append(train_acc)
@@ -234,7 +277,3 @@ def main():
             ax2.set_xlabel('Epoch')
             plt.legend()
             plt.savefig(f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.png')
-
-
-if __name__ == "__main__":
-    main()

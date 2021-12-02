@@ -174,5 +174,5 @@ class Wide_ResNet(nn.Module):
         out = self.linear(out)
 
         return out
-def Wide_ResNet28_10():
-    return Wide_ResNet(28, 10, 0.3, 100)
+def Wide_ResNet28_10(args):
+    return Wide_ResNet(28, 10, args.dropout, 100)
