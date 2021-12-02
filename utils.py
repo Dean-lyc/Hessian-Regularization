@@ -5,9 +5,6 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 import torch.distributed as dist
-import torch.nn.init as init
-from torch.autograd import Variable
-import numpy as np
 
 def get_world_size():
     if not dist.is_available():
@@ -15,11 +12,6 @@ def get_world_size():
     if not dist.is_initialized():
         return 1
     return dist.get_world_size()
-
-
-
-
-
 
 def cutout(mask_size, p, cutout_inside, mask_color=(0, 0, 0)):
     mask_size_half = mask_size // 2
@@ -101,9 +93,32 @@ def get_loader(args):
         testset = torchvision.datasets.CIFAR10(root=args.dataset_path, train=False, download=True, transform=transform_test)
         trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
         testLoader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+    if args.dataset_name == "CIFAR100":
+        if args.mask_size == 0:
+            transform_train = transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+            ]) # meanstd transformation
+        else:
+            transform_train = transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                normalize([0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]),
+                cutout(8, 1, True),
+                to_tensor(),
+            ])
 
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+        ])
+        trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_test)
+        trainLoader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=8)
+        testLoader = torch.utils.data.DataLoader(testset, batch_size=32, shuffle=False, num_workers=8)
     return trainLoader, testLoader
-
 
 
 
