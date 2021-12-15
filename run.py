@@ -165,7 +165,11 @@ def main():
     train_record = []
     test_record = []
     hessian_record = []
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    if args.model == "resnet18":
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    elif args.model == "wide2810":
+        net = Wide_ResNet28_10(args).to(device)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[60, 120, 160], gamma=0.2)
 
     start_time = datetime.datetime.now()
     # Train
@@ -239,7 +243,7 @@ def main():
                 print(INFO)
                 with open(output_filename ,'a',encoding='utf-8') as f:
                     f.write(INFO)
-        elif if args.dataset_name == "CIFAR100":
+        elif args.dataset_name == "CIFAR100":
             valid_acc, valid_acc_5 = valid(args, net, testLoader, device)
             if valid_acc >  max_test_1:
                 max_test_1 = valid_acc
