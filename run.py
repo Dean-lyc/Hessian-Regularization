@@ -168,7 +168,6 @@ def main():
     if args.model == "resnet18":
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
     elif args.model == "wide2810":
-        net = Wide_ResNet28_10(args).to(device)
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[60, 120, 160], gamma=0.2)
 
     start_time = datetime.datetime.now()
@@ -281,3 +280,6 @@ def main():
             ax2.set_xlabel('Epoch')
             plt.legend()
             plt.savefig(f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.png')
+
+if __name__ == "__main__":
+    main() 
