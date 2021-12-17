@@ -260,9 +260,16 @@ def main():
         hessian_record.append(hessian_loss)
 
     if args.local_rank in [-1, 0]:
-        print('Finished Training, max test accuracy', 100 * max_test)
-        with open(output_filename,'a',encoding='utf-8') as f:
-            f.write('Best TEST Accuracy inputs: %.3f %% \n' % (100 * max_test))
+        if args.dataset_name == "CIFAR10":
+            print('Finished Training, max test accuracy', 100 * max_test)
+            with open(output_filename,'a',encoding='utf-8') as f:
+                f.write('Best TEST Accuracy inputs: %.3f %% \n' % (100 * max_test))
+        elif args.dataset_name == "CIFAR100":
+            print('Finished Training, max test 1 accuracy', 100 * max_test_1)
+            print('Finished Training, max test 5 accuracy', 100 * max_test_5)
+            with open(output_filename,'a',encoding='utf-8') as f:
+                f.write('Best TEST 1 Accuracy inputs: %.3f %% \n' % (100 * max_test_1))
+                f.write('Best TEST 5 Accuracy inputs: %.3f %% \n' % (100 * max_test_5))
         end_time = datetime.datetime.now()
         delta = end_time - start_time
         delta_gmtime = time.gmtime(delta.total_seconds())
