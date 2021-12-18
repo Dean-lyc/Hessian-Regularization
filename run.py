@@ -253,7 +253,7 @@ def main():
 
         train_acc = correct / total
         # Validation after training
-        if args.dataset_name == "CIFAR10":
+        if args.dataset_name == "cifar10":
             valid_acc = valid(args, net, testLoader, device)
             if valid_acc >  max_test:
                 max_test = valid_acc
@@ -262,7 +262,7 @@ def main():
                 print(INFO)
                 with open(output_filename ,'a',encoding='utf-8') as f:
                     f.write(INFO)
-        elif args.dataset_name == "CIFAR100":
+        elif args.dataset_name == "cifar100" or args.dataset_name == "imagenet":
             valid_acc, valid_acc_5 = valid(args, net, testLoader, device)
             if valid_acc >  max_test_1:
                 max_test_1 = valid_acc
@@ -280,11 +280,11 @@ def main():
         hessian_record.append(hessian_loss)
 
     if args.local_rank in [-1, 0]:
-        if args.dataset_name == "CIFAR10":
+        if args.dataset_name == "cifar10":
             print('Finished Training, max test accuracy', 100 * max_test)
             with open(output_filename,'a',encoding='utf-8') as f:
                 f.write('Best TEST Accuracy inputs: %.3f %% \n' % (100 * max_test))
-        elif args.dataset_name == "CIFAR100":
+        elif args.dataset_name == "cifar100" or args.dataset_name=="imagenet":
             print('Finished Training, max test 1 accuracy', 100 * max_test_1)
             print('Finished Training, max test 5 accuracy', 100 * max_test_5)
             with open(output_filename,'a',encoding='utf-8') as f:
