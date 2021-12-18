@@ -95,10 +95,10 @@ class ResNet(nn.Module):
         out = self.linear(out)
         return out
 
-def ResNet18():
-    return ResNet(BasicBlock, [2, 2, 2, 2])
-def ResNet50():
-    return ResNet(Bottleneck, [3, 4, 6, 3])
+def ResNet18(num_classes=10):
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=num_classes)
+def ResNet50(num_classes=10):
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes)
 
 def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True)
@@ -174,5 +174,5 @@ class Wide_ResNet(nn.Module):
         out = self.linear(out)
 
         return out
-def Wide_ResNet28_10(args):
-    return Wide_ResNet(28, 10, args.dropout, 100)
+def Wide_ResNet28_10(args, num_classes):
+    return Wide_ResNet(28, 10, args.dropout, num_classes)

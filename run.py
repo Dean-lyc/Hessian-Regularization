@@ -19,14 +19,15 @@ from datetime import timedelta
 import os
 
 
-from resnet import ResNet18, ResNet50, Wide_ResNet28_10
+from models.resnet import ResNet18, ResNet50, Wide_ResNet28_10
+from models.resnet_imagenet import resnet18, resnet50
 from utils import *
 from hess import *
 
 
 def valid(args, net, testLoader, device):
     net.eval()
-    if args.dataset_name == "CIFAR10":
+    if args.dataset_name == "cifar10":
         correct = 0
         total = 0
         with torch.no_grad():
@@ -40,7 +41,7 @@ def valid(args, net, testLoader, device):
 
         return correct / total
 
-    elif args.dataset_name == "CIFAR100":
+    elif args.dataset_name == "cifar100" or "imagenet":
         correct = 0
         total = 0
         correct_1 = 0
@@ -68,9 +69,9 @@ def valid(args, net, testLoader, device):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local_rank", type=int, default=-1,
+    parser.add_argument("--local_rank", type=int, default=0,
                         help="local_rank for distributed training on gpus")
-    parser.add_argument("--output_dir", type=str, default="res",
+    parser.add_argument("--output_dir", type=str, default="../result/seht",
                         help="output directory")
 
 
@@ -93,7 +94,7 @@ def main():
     # Dataset setting
     parser.add_argument("--dataset_path", type=str, default='../data',
                         help="where is the datset")
-    parser.add_argument("--dataset_name", type=str, default='CIFAR10',
+    parser.add_argument("--dataset_name", type=str, default='cifar10',
                         help="the name of the dataset")
     parser.add_argument("--num_workers", type=int, default=8,
                         help="number of workers of data loader")
@@ -131,7 +132,7 @@ def main():
     if not os.path.exists(args.output_dir) and args.local_rank in [0, -1]:
         os.makedirs(args.output_dir)
 
-    output_filename = f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.txt'
+    output_filename = f'{args.output_dir}/random_hessian_{args.dataset_name}_{args.lambda_JR}_{args.Hiter}_{args.hess_interval}_{args.prob}.txt'
 
     if args.local_rank==-1:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -142,12 +143,31 @@ def main():
         torch.distributed.init_process_group(backend='nccl',
                                              timeout=timedelta(minutes=60))
 
+    if args.dataset_name=="cifar10":
+        nb_classes=10
+    elif args.dataset_name=="cifar100":
+        nb_classes=100
+    else:
+        nb_classes=1000
 
     trainLoader, testLoader = get_loader(args)
-    if args.model == "resnet18":
-        net = ResNet18().to(device)
-    elif args.model == "wide2810":
-        net = Wide_ResNet28_10(args).to(device)
+    if "cifar" in args.dataset_name:
+        if args.model == "resnet18":
+            net = ResNet18(nb_classes).to(device)
+
+        if args.model == "resnet50":
+            net = ResNet50(nb_classes).to(device)
+
+        elif args.model == "wide2810":
+            net = Wide_ResNet28_10(args, nb_classes).to(device)
+
+    if args.dataset_name=="imagenet":
+        if args.model == "resnet18":
+            net = resnet18().to(device)
+
+        if args.model == "resnet50":
+            net = resnet50().to(device)
+
 
     if args.local_rank!=-1:
         # net = DDP(net, message_size=250000000, gradient_predivide_factor=get_world_size(), delay_allreduce=True)
@@ -229,7 +249,7 @@ def main():
             with torch.no_grad():
             # print statistics
                 running_loss += loss_super.item()
-                hessian_loss += hessian_tr
+                hessian_loss += hloss.item()
 
         train_acc = correct / total
         # Validation after training
@@ -256,7 +276,7 @@ def main():
         scheduler.step()
 
         train_record.append(train_acc)
-        test_record.append(valid_acc)
+        test_record.append(valid_acc.cpu())
         hessian_record.append(hessian_loss)
 
     if args.local_rank in [-1, 0]:
@@ -286,7 +306,7 @@ def main():
             ax2.set_ylabel('Estimated Hessian Trace')
             ax2.set_xlabel('Epoch')
             plt.legend()
-            plt.savefig(f'{args.output_dir}/random_hessian_{args.lambda_JR}_{args.Hiter}_{args.prob}_CP{args.lambda_CP}_LS{args.lambda_LS}.png')
+            plt.savefig(f'{args.output_dir}/random_hessian_{args.dataset_name}_{args.lambda_JR}_{args.Hiter}_{args.hess_interval}_{args.prob}.png')
 
 if __name__ == "__main__":
     main() 

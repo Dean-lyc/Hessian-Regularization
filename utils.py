@@ -5,6 +5,9 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 import torch.distributed as dist
+import os
+from torch.utils.data import DataLoader, RandomSampler, DistributedSampler, SequentialSampler
+
 
 def get_world_size():
     if not dist.is_available():
@@ -93,6 +96,8 @@ def get_loader(args):
         testset = torchvision.datasets.CIFAR10(root=args.dataset_path, train=False, download=True, transform=transform_test)
         trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
         testLoader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+
+
     if args.dataset_name == "CIFAR100":
         if args.mask_size == 0:
             transform_train = transforms.Compose([
@@ -116,8 +121,43 @@ def get_loader(args):
         ])
         trainset = torchvision.datasets.CIFAR100(root=args.dataset_path, train=True, download=True, transform=transform_train)
         testset = torchvision.datasets.CIFAR100(root=args.dataset_path, train=False, download=True, transform=transform_test)
-        trainLoader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=8)
-        testLoader = torch.utils.data.DataLoader(testset, batch_size=32, shuffle=False, num_workers=8)
+        trainLoader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+        testLoader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+
+    elif args.dataset_name == "imagenet":
+        traindir = os.path.join(args.dataset_path, 'train')
+        valdir = os.path.join(args.dataset_path, 'val')
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+
+        train_dataset = torchvision.datasets.ImageFolder(
+            traindir,
+            transforms.Compose([
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]))
+        if args.local_rank == 0:
+            torch.distributed.barrier()
+
+
+        train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else torch.utils.data.distributed.DistributedSampler(train_dataset)
+
+        trainLoader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+            num_workers=args.num_workers, pin_memory=True, sampler=train_sampler)
+
+        testLoader = torch.utils.data.DataLoader(
+            torchvision.datasets.ImageFolder(valdir, transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                normalize,
+            ])),
+            batch_size=args.batch_size, shuffle=False,
+            num_workers=args.num_workers, pin_memory=True)
+
     return trainLoader, testLoader
 
 
